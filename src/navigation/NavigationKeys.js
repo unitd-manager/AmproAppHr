@@ -20,4 +20,5 @@ export const StackNav = {
   Search: 'Search',
   WelcomeScreen: 'WelcomeScreen',
   ViewLeaves:'ViewLeaves',
+  AuthChoice: 'AuthChoice',
 };

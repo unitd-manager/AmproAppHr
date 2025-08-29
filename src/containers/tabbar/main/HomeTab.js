@@ -16,9 +16,12 @@ import strings from '../../../i18n/strings';
 import api from '../../../api/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from 'react-native-geolocation-service';
+import { isInsideGeofence, fetchGeofenceData } from '../../../utils/geofence';
+import { androidLocationPermission } from '../../../components/homeComponent/permissions';
 
 
 export default function HomeTab({navigation}) {
+  const [canCheckIn, setCanCheckIn] = useState(false);
   const colors = useSelector(state => state.theme.theme);
   // const userData = useSelector(state => state.user.userData);
   const [currentInsertId, setCurrentInsertId] = useState(null);
@@ -41,12 +44,52 @@ export default function HomeTab({navigation}) {
   const [location, setLocation] = useState({latitude: 0, longitude: 0});
   const [refreshing, setRefreshing] = useState(false);
 
-  Geolocation.getCurrentPosition(data => {
-    setLocation({
-      latitude: data.coords.latitude,
-      longitude: data.coords.longitude,
-    });
-  });
+useEffect(() => {
+  const requestAndGetLocation = async () => {
+    const hasPermission = await androidLocationPermission();
+    if (hasPermission) {
+      const geofenceData = await fetchGeofenceData();
+      if (geofenceData) {
+        Geolocation.getCurrentPosition(
+          (data) => {
+            const currentLat = data.coords.latitude;
+            const currentLng = data.coords.longitude;
+
+            setLocation({ latitude: currentLat, longitude: currentLng });
+
+            console.log("Current Location:", { latitude: currentLat, longitude: currentLng });
+
+            // ✅ Only check if geofenceData has proper values
+            if (geofenceData.latitude && geofenceData.longitude && geofenceData.radius) {
+              const insideGeofence = isInsideGeofence(
+                currentLat,
+                currentLng,
+                geofenceData.latitude,
+                geofenceData.longitude,
+                geofenceData.radius
+              );
+              console.log("Is inside geofence:", insideGeofence);
+              setCanCheckIn(insideGeofence);
+            } else {
+              console.log("Invalid geofence data:", geofenceData);
+              setCanCheckIn(false);
+            }
+          },
+          (error) => {
+            console.log("Geolocation error: ", error);
+            Alert.alert("Location Error", `Error getting location: ${error.message}. Code: ${error.code}`);
+            setCanCheckIn(false);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      } else {
+        Alert.alert("Geofence Error", "Failed to load geofence data. Please try again.");
+        setCanCheckIn(false);
+      }
+    }
+  };
+  requestAndGetLocation();
+}, []);
 
   const onPressModalClose = useCallback(() => {
     setModalVisible(false);
@@ -175,7 +218,10 @@ export default function HomeTab({navigation}) {
         day_checkIn_latitude: day_checkIn_latitude,
         day_checkIn_longitude: day_checkIn_longitude,
       };
-
+      Alert.alert(
+        'Day Check-In',
+        `Latitude: ${day_checkIn_latitude}\nLongitude: ${day_checkIn_longitude}`
+      );
       api
         .post('/attendance/insertAppAttendance', user)
         .then(({data}) => {
@@ -184,7 +230,6 @@ export default function HomeTab({navigation}) {
           AsyncStorage.setItem('btnTextDay', strings.daycheckout);
           AsyncStorage.setItem('lastClickedButton', 'day');
           AsyncStorage.setItem('currentInsertId', data.data.insertId.toString());
-          Alert.alert('Day Attendance inserted successfully.');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
         .catch(error => {
@@ -201,7 +246,10 @@ export default function HomeTab({navigation}) {
         night_checkIn_latitude: night_checkIn_latitude,
         night_checkIn_longitude: night_checkIn_longitude,
       };
-
+      Alert.alert(
+        'Night Check-In',
+        `Latitude: ${night_checkIn_latitude}\nLongitude: ${night_checkIn_longitude}`
+      );
       api
         .post('/attendance/insertAppAttendance', user)
         .then(({data}) => {
@@ -210,12 +258,33 @@ export default function HomeTab({navigation}) {
           AsyncStorage.setItem('btnTextNight', strings.nightcheckout);
           AsyncStorage.setItem('lastClickedButton', 'night');
           AsyncStorage.setItem('currentInsertId', data.data.insertId.toString());
-          Alert.alert('Night Attendance inserted successfully.');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
         .catch(() => {
           Alert.alert('Network connection error.');
         });
+    }
+  };
+
+   const handleDayPress = (item) => {
+    if (!canCheckIn) {
+      Alert.alert(
+        'You are not in office location',
+        `Latitude: ${location.latitude}\nLongitude: ${location.longitude}`
+      );
+    } else {
+      onPress(item, 'day');
+    }
+  };
+
+  const handleNightPress = (item) => {
+    if (!canCheckIn) {
+      Alert.alert(
+        'You are not in office location',
+        `Latitude: ${location.latitude}\nLongitude: ${location.longitude}`
+      );
+    } else {
+      onPress(item, 'night');
     }
   };
 
@@ -236,10 +305,13 @@ export default function HomeTab({navigation}) {
         day_checkOut_latitude: day_checkOut_latitude,
         day_checkOut_longitude: day_checkOut_longitude,
       };
+      Alert.alert(
+        'Day Check-Out',
+        `Latitude: ${day_checkOut_latitude}\nLongitude: ${day_checkOut_longitude}`
+      );
       api
         .post('/attendance/updateAppAttendance', user)
         .then(() => {
-          Alert.alert('Day check-out time inserted successfully.');
           setInsertedData(user);
           AsyncStorage.setItem('btnTextDay', strings.daycheckIn);
           AsyncStorage.removeItem('lastClickedButton');
@@ -258,11 +330,13 @@ export default function HomeTab({navigation}) {
         night_checkOut_latitude: night_checkOut_latitude,
         night_checkOut_longitude: night_checkOut_longitude,
       };
-
+      Alert.alert(
+        'Night Check-Out',
+        `Latitude: ${night_checkOut_latitude}\nLongitude: ${night_checkOut_longitude}`
+      );
       api
         .post('/attendance/updateAppAttendance', user)
         .then(() => {
-          Alert.alert('Night check-out time inserted successfully.');
           setInsertedData(user);
           AsyncStorage.setItem('btnTextNight', strings.nightcheckIn);
           AsyncStorage.removeItem('lastClickedButton');
@@ -386,10 +460,10 @@ export default function HomeTab({navigation}) {
           btnTextDay={btnTextDay}
           btnTextNight={btnTextNight}
           textColor={commonColor.primary5}
-          onPressBtnDay={() => onPress(item, 'day')}
-          onPressBtnNight={() => onPress(item, 'night')}
-          isDayButtonVisible={isDayButtonVisible}
-          isNightButtonVisible={isNightButtonVisible}
+          onPressBtnDay={() => handleDayPress(item)}
+          onPressBtnNight={() => handleNightPress(item)}
+          isDayButtonVisible={true}
+          isNightButtonVisible={true}
           insertAttendance={insertAttendance}
         />
       </>

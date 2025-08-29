@@ -124,9 +124,44 @@ const Login = () => {
       password: password
     }).then(async (res) => {
       if (res && res.data.msg === 'Success') {
-        await AsyncStorage.setItem('USER_TOKEN', 'loggedin')
-        await AsyncStorage.setItem('USER', JSON.stringify(res.data.data))
-        signIn('124')
+        console.log('Login response data:', res.data.data);
+        
+        try {
+          // Store user token
+          await AsyncStorage.setItem('USER_TOKEN', 'loggedin');
+          console.log('USER_TOKEN stored successfully');
+          
+          // Store user data
+          const userDataString = JSON.stringify(res.data.data);
+          await AsyncStorage.setItem('USER', userDataString);
+          console.log('USER data stored successfully:', userDataString);
+          
+          // Verify user data was stored
+          const storedUserData = await AsyncStorage.getItem('USER');
+          console.log('Verification - stored USER data:', storedUserData);
+          
+          // Store biometric user ID with better validation
+          const userData = res.data.data;
+          const biometricUserId = userData?.staff_id;
+          
+          console.log('Staff ID for biometric:', biometricUserId);
+          
+          if (biometricUserId !== undefined && biometricUserId !== null && biometricUserId !== '') {
+            await AsyncStorage.setItem('BIOMETRIC_USER_ID', String(biometricUserId));
+            console.log('Biometric User ID stored:', String(biometricUserId));
+            
+            // Verify biometric ID was stored
+            const storedBiometricId = await AsyncStorage.getItem('BIOMETRIC_USER_ID');
+            console.log('Verification - stored BIOMETRIC_USER_ID:', storedBiometricId);
+          } else {
+            console.log('Warning: No valid staff_id found for biometric setup');
+          }
+          
+          signIn('124');
+        } catch (storageError) {
+          console.log('AsyncStorage error:', storageError);
+          Alert.alert('Storage Error', 'Failed to save login data. Please try again.');
+        }
       } else if (res && res.data.msg === 'No User found') {
         Alert.alert('Login Failed', 'This mail is not registered with us');
       } else if (res && res.data.msg === 'Invalid password') {

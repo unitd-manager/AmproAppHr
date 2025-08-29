@@ -9,12 +9,11 @@ export default function AuthStack() {
   
 
   return (
-   
-      <Stack.Navigator
-        screenOptions={{headerShown: false}}
-        initialRouteName={StackNav.Login}>
-          <Stack.Screen name={StackNav.Login} component={StackRoute.Login} />
-      </Stack.Navigator>
-   
+    <Stack.Navigator
+      screenOptions={{headerShown: false}}
+      initialRouteName={StackNav.AuthChoice}>
+      <Stack.Screen name={StackNav.AuthChoice} component={StackRoute.AuthChoice} />
+      <Stack.Screen name={StackNav.Login} component={StackRoute.Login} />
+    </Stack.Navigator>
   );
 }

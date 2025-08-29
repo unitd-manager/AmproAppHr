@@ -23,16 +23,19 @@ const LogOut = props => {
 
   const onPressLogOut = async () => {
     try {
-      await AsyncStorage.clear()
-      signOut()
+      // Preserve biometric link across logout
+      const biometricId = await AsyncStorage.getItem('BIOMETRIC_USER_ID');
+      const keys = await AsyncStorage.getAllKeys();
+      const keysToRemove = keys.filter(k => k !== 'BIOMETRIC_USER_ID' && k !== 'USER');
+      if (keysToRemove.length) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
+      if (biometricId) {
+        await AsyncStorage.setItem('BIOMETRIC_USER_ID', biometricId);
+      }
+      signOut();
       await removeUserDetail(ACCESS_TOKEN);
       SheetRef?.current?.hide();
-      // setTimeout(() => {
-      //   navigation.reset({
-      //     index: 0,
-      //     routes: [{name: StackNav.Auth}],
-      //   });
-      // }, 500);
       return true;
     } catch (exception) {
       return false;

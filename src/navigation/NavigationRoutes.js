@@ -32,4 +32,5 @@ export const StackRoute = {
   SelfieWithId,
   HomeListCard,
   Auth,
+  AuthChoice: require('../containers/auth/AuthChoiceScreen').default,
 };
